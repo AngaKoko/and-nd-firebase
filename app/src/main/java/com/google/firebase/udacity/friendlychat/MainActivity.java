@@ -137,27 +137,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        mChildEventListener = new ChildEventListener() {
-            @Override
-            public void onChildAdded(DataSnapshot dataSnapshot, String s) {
-                FriendlyMessage friendlyMessage = dataSnapshot.getValue(FriendlyMessage.class);
-                mMessageAdapter.add(friendlyMessage);
-            }
-            @Override
-            public void onChildChanged(DataSnapshot dataSnapshot, String s) {
-            }
-            @Override
-            public void onChildRemoved(DataSnapshot dataSnapshot) {
-            }
-            @Override
-            public void onChildMoved(DataSnapshot dataSnapshot, String s) {
-            }
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-            }
-        };
-        mMessagesDatabaseReference.addChildEventListener(mChildEventListener);
-
         mAuthStateListener = new FirebaseAuth.AuthStateListener() {
             @Override
             public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
@@ -165,8 +144,10 @@ public class MainActivity extends AppCompatActivity {
                 FirebaseUser user = firebaseAuth.getCurrentUser();
                 if (user != null) {
                     // already signed in
+                    onSignedInInitializer(user.getDisplayName());
                 } else {
                     // not signed in
+                    onSignedOutCleanUp();
                     startActivityForResult(
                             AuthUI.getInstance()
                             .createSignInIntentBuilder()
@@ -198,12 +179,55 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        mFirebaseAuth.removeAuthStateListener(mAuthStateListener);
+        if(mAuthStateListener != null) {
+            mFirebaseAuth.removeAuthStateListener(mAuthStateListener);
+        }
+        detacheDatabaseReadListener();
+        mMessageAdapter.clear();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
         mFirebaseAuth.addAuthStateListener(mAuthStateListener);
+    }
+
+    public void onSignedInInitializer(String userName){
+        mUsername = userName;
+        attachedDatabaseReadListener();
+    }
+
+    public void onSignedOutCleanUp(){
+        mUsername = ANONYMOUS;
+        mMessageAdapter.clear();
+        detacheDatabaseReadListener();
+    }
+
+    public  void attachedDatabaseReadListener(){
+        if(mChildEventListener == null){
+            mChildEventListener = new ChildEventListener() {
+                @Override
+                public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+                    FriendlyMessage friendlyMessage = dataSnapshot.getValue(FriendlyMessage.class);
+                    mMessageAdapter.add(friendlyMessage);
+                }
+                @Override
+                public void onChildChanged(DataSnapshot dataSnapshot, String s) { }
+                @Override
+                public void onChildRemoved(DataSnapshot dataSnapshot) { }
+                @Override
+                public void onChildMoved(DataSnapshot dataSnapshot, String s) { }
+                @Override
+                public void onCancelled(DatabaseError databaseError) { }
+            };
+            mMessagesDatabaseReference.addChildEventListener(mChildEventListener);
+        }
+    }
+
+    public void detacheDatabaseReadListener(){
+        if(mChildEventListener != null) {
+            mMessagesDatabaseReference.removeEventListener(mChildEventListener);
+            mChildEventListener = null;
+        }
     }
 }
